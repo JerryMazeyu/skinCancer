@@ -17,6 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim import lr_scheduler
 import torchvision
 from utils.ShowMeImgs import matplotlib_imshow, select_n_random
+from tqdm import tqdm
 
 
 
@@ -42,6 +43,7 @@ class BasicTrainer(abc.ABC):
         self.ckpt_name = ckpt_name
         self.verbose = verbose
         self.writer = SummaryWriter(os.path.join(root, 'runs', exp_name))
+        torch.cuda.empty_cache()
 
     @abc.abstractmethod
     def _evaluate(self, opts, labels):
@@ -56,6 +58,8 @@ class BasicTrainer(abc.ABC):
             log_here("load path OK!", 'info', path=log_path, ifPrint=self.verbose)
         except:
             log_here("no model.pth in %s" % ckpt_path, 'debug', path=log_path, ifPrint=self.verbose)
+
+        self.model.to(opt.device)
 
         best_how_good = 0.0
 
@@ -79,8 +83,8 @@ class BasicTrainer(abc.ABC):
                 running_loss = 0.0
                 how_good = 0
 
-                for inputs, labels in custom_data_res.dataloader[phase]:
-                    print("Training Still On ... ---->")
+
+                for inputs, labels in tqdm(custom_data_res.dataloader[phase], ncols=60):
                     inputs = inputs.to(self.device)
                     labels = labels.to(self.device)
                     self.optimizer.zero_grad()
@@ -94,9 +98,9 @@ class BasicTrainer(abc.ABC):
                             loss.backward()
                             self.optimizer.step()
 
-                    running_loss += loss.item() * inputs.size(0)
-                    how_good += self._evaluate(outputs, labels)
-                    break
+                    running_loss += float(loss.item() * inputs.size(0))
+                    how_good += float(self._evaluate(outputs, labels))
+                    # break
 
 
 
@@ -104,7 +108,7 @@ class BasicTrainer(abc.ABC):
                     lr_scheduler.StepLR(self.optimizer, step_size=opt.every_lr_decay, gamma=0.1).step()
 
                 epoch_loss = running_loss / custom_data_res.dataset_size[phase]
-                epoch_acc = how_good.double() / custom_data_res.dataset_size[phase]
+                epoch_acc = how_good / custom_data_res.dataset_size[phase]
 
                 epoch_losses.append(epoch_loss)
                 how_good_losses.append(epoch_acc)
@@ -114,6 +118,7 @@ class BasicTrainer(abc.ABC):
 
 
                 if phase == 'val' and epoch_acc > best_how_good:
+                    best_how_good = epoch_acc
                     best_model_wts = copy.deepcopy(self.model.state_dict())
                     prefix = 'model_' + str(epoch) + '.pth'
                     torch.save(best_model_wts, os.path.join(self.exp_root, prefix))
@@ -146,19 +151,20 @@ class BasicTrainer(abc.ABC):
 
             # write to tensorboard
             self.writer.add_image(self.exp_name, img_grid)
-            self.writer.add_graph(self.model, images)
+            cpu_model = self.model.cpu()
+            self.writer.add_graph(cpu_model, images)
             images, labels = select_n_random(custom_data_res.dataset['train'])
             # 这里也可能需要重载
             print("May be you should find here and reload this.")
             features = images.view(-1, images.shape[1]*images.shape[2]*images.shape[3])
             self.writer.add_embedding(features, metadata=labels)
-
             for ind, los in enumerate(every_losses):
                 self.writer.add_scalar('Every Loss', los, ind)
             self.writer.close()
-
-
-
+            for ind, los in enumerate(epoch_losses):
+                self.writer.add_scalar('Epoch Loss', los, ind)
+            for ind, los in enumerate(how_good_losses):
+                self.writer.add_scalar('Epoch Acc', los, ind)
 
 
 

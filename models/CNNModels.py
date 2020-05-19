@@ -35,7 +35,10 @@ def changeClasses(model:torchvision.models, classes=2, verbose=True):
         last_layer_name = list(model._modules.keys())[-1]
         setattr(model, last_layer_name, supplement_layer)
         if verbose:
-            summary(model, (3, 224, 224))
+            try:
+                summary(model, (3, 224, 224))
+            except:
+                summary(model.cuda(), (3, 224, 224))
         return model
     except:  # 有时候最后一层是Sequential
         in_features = list(model.children())[-1][-1].in_features
@@ -47,7 +50,10 @@ def changeClasses(model:torchvision.models, classes=2, verbose=True):
         if verbose:
             print("Last Layer Is Sequential!")
             print("-"*78)
-            summary(model, (3, 224, 224))
+            try:
+                summary(model, (3, 224, 224))
+            except:
+                summary(model.cuda(), (3, 224, 224))
         return model
 
 
@@ -56,7 +62,10 @@ def replaceLastLayer(model:torchvision.models, layers=IndetifyLayer(), verbose=T
     last_layer_name = list(model._modules.keys())[-1]
     setattr(model, last_layer_name, layers)
     if verbose:
-        summary(model, (3,224,224))
+        try:
+            summary(model, (3, 224, 224))
+        except:
+            summary(model.cuda(), (3, 224, 224))
     return model
 
 
@@ -88,13 +97,15 @@ class Mynet_MTL1(nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
-        class_hat = torch.nn.functional.softmax(x[:, 0:2], dim=1)
+        class_hat = x[:, 0:2]
+        # class_hat = torch.nn.functional.softmax(x[:, 0:2], dim=1)
         pred_hat = torch.nn.functional.relu(x[:, 2]).unsqueeze(1)
         # print("--->", class_hat, pred_hat.shape)
         x = torch.cat([class_hat, pred_hat], dim=1)
         # print("--->", x[0].shape, x[1].shape)
         return x
 
+normal_net = changeClasses(resnet50(pretrained=True), classes=opt.classes, verbose=False)
 
 
 
@@ -125,6 +136,7 @@ if __name__ == '__main__':
     # summary(MyNet(), ((3, 224, 224), (1)))
     inp = torch.rand((5,3,224,224))
     # net = MyNet()
-    net = Mynet_MTL1()
+    # net = Mynet_MTL1()
+    net = normal_net
     print(net(inp))
     print("OK")

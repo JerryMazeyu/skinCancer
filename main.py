@@ -25,27 +25,20 @@ args = parser.parse_args()
 
 
 
-# 1 指定两个call_back函数:
-#     1.1 get_label(imgpath, classid)
-#     1.2 img_call_back(imgpath)
-# 2 得到DataSet的结构体
-#     custom_data = CustomBuildDataset(dateset_name=opt.dataset_name, classes_dict={'melanoma':0, 'nevus':1}, transform=transform_example, call_back=get_label)
-#     custom_data = custom_data.main()
-# 3 引入模型
-#     from models.CNNModels import MyNet
-#     mynet = MyNet()
-# 4 引入loss(若有需要)
-#     from models.Losses import CrossEntropyLossWithPenalty
-#     myloss = CrossEntropyLossWithPenalty()
-# 5 定义训练模型需要的参数 --> optimizer_ft lr_scheduler等
-#     criterion = nn.CrossEntropyLoss()
-#     optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
-#     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+
+
+
+
+
 
 
 # 先验知识的json
 with open(os.path.join(root, opt.prior_knowledge_josn_path)) as f:
     sym_dict = json.load(f)
+
+
+
+
 
 
 
@@ -69,6 +62,17 @@ def img_call_back1(imgpath, img):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 # 对于label的处理逻辑
 def get_label(imgpath, classid):
     return classid
@@ -79,14 +83,46 @@ def get_label1(imgpath, classid):
 
 
 
+
+
+
+
+
+
+
+
 # 得到dataset、dataloader、dataset_size一个结构体
 custom_data = CustomBuildDataset(dateset_name=opt.dataset_name, classes_dict={'melanoma':0, 'nevus':1}, transform=transform_example, call_back=get_label, img_call_back=img_call_back)
 custom_data = custom_data.main()
 custom_data1 = CustomBuildDataset(dateset_name=opt.dataset_name, classes_dict={'melanoma':0, 'nevus':1}, transform=transform_example, call_back=get_label1, img_call_back=img_call_back1)
 custom_data1 = custom_data1.main()
-# 示例化网络
+custom_data_norm = CustomBuildDataset(dateset_name=opt.dataset_name, classes_dict={'melanoma':0, 'nevus':1}, transform=transform_example, call_back=get_label, img_call_back=img_call_back1)
+custom_data_norm = custom_data_norm.main()
+
+
+
+
+
+
+
+# 实例化网络
 mynet = MyNet()
 mynet1 = Mynet_MTL1()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def get_optimizer(op_name, model=eval(opt.model_name)):
@@ -97,6 +133,19 @@ def get_optimizer(op_name, model=eval(opt.model_name)):
         return optim.Adam(model.parameters(), lr=opt.lr)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 class Trainer1(BasicTrainer):
     def __init__(self, exp_name, model, num_epoch, criterion, optimizer, device, ckpt_name, verbose=True):
         super(Trainer1, self).__init__(exp_name, model, num_epoch, criterion, optimizer, device, ckpt_name, verbose)
@@ -104,6 +153,18 @@ class Trainer1(BasicTrainer):
     def _evaluate(self, opts, labels):
         _, preds = torch.max(opts, 1)
         return torch.sum(preds == labels.data)
+
+
+
+
+
+
+
+
+
+
+
+
 
 class Trainer2(BasicTrainer):
     def __init__(self, exp_name, model, num_epoch, criterion, optimizer, device, ckpt_name, verbose=True):
@@ -119,15 +180,57 @@ class Trainer2(BasicTrainer):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+class Trainer3(BasicTrainer):
+    """
+    normal Trainer
+    """
+    def __init__(self, exp_name, model, num_epoch, criterion, optimizer, device, ckpt_name, verbose=True):
+        super(Trainer3, self).__init__(exp_name, model, num_epoch, criterion, optimizer, device, ckpt_name, verbose)
+
+    def _evaluate(self, opts, labels):
+        _, preds = torch.max(opts, 1)
+        res = torch.sum(preds == labels)
+        return res
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class CreateExperimental(object):
-    def __init__(self, exp_name=args.exp_name, model=args.model_name, epoch=args.epoch, device=args.device, verbose=True, criterion=opt.criterion, trainer=eval(opt.trainer)):
+    def __init__(self, exp_name=args.exp_name, model=args.model_name, epoch=args.epoch, device=args.device, verbose=True, criterion=opt.criterion, trainer=eval(opt.trainer), data_res=opt.custom_data):
         self.exp_name = exp_name
         self.model = eval(model)
         self.epoch = epoch
         self.device = device
         self.exp_root = os.path.join(root, opt.experiment_root, self.exp_name)
         self.verbose = verbose
-        self.data_res = eval(opt.custom_data)
+        self.data_res = eval(data_res)
         self.criterion = criterion
         self.trainer = trainer
 
@@ -141,7 +244,7 @@ class CreateExperimental(object):
 
 
     def main(self):
-        ce = self.trainer(exp_name=self.exp_name, model=self.model, num_epoch=self.epoch, criterion=self.criterion, optimizer=get_optimizer(opt.optimizer_ft, model=eval(opt.model_name)), device=self.device, ckpt_name='model.pth')
+        ce = self.trainer(exp_name=self.exp_name, model=self.model, num_epoch=self.epoch, criterion=self.criterion, optimizer=get_optimizer(opt.optimizer_ft, model=self.model), device=self.device, ckpt_name='model.pth')
         ce(self.data_res)
 
 
@@ -149,5 +252,9 @@ class CreateExperimental(object):
 if __name__ == '__main__':
     # ce = CreateExperimental(epoch=1)
     # ce.main()
-    ce = CreateExperimental(exp_name='exp2', model='mynet1', epoch=1, criterion=CrossEntropyLossWithPenalty())
+    # ce = CreateExperimental(exp_name='normal_train', model='normal_net', epoch=50, criterion=torch.nn.CrossEntropyLoss(), trainer=Trainer3, data_res='custom_data_norm')
+    # ce.main()
+    ce = CreateExperimental(exp_name='feature_map_concat', model='mynet', epoch=50,
+                            criterion=torch.nn.CrossEntropyLoss(), trainer=Trainer1, data_res='custom_data')
     ce.main()
+

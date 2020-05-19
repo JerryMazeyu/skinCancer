@@ -35,7 +35,8 @@ def __gray2RGB(img):
 
 transform_example = T.Compose([
     # T.Lambda(lambda img: __gray2RGB(img)),
-    T.Resize(224),  # Resize只有一个参数!!!!
+    T.Resize((224,224)),
+    # T.Normalize(),
     T.ToTensor(),
     # T.Compose()
 ])
@@ -248,46 +249,21 @@ result = build.build_datasets()
 
 
 if __name__ == '__main__':
-    # pass
-    # build_dataset = BuildDataset(if_use_local_file=args.if_local, dataset_name='tst', if_train_val=True)
-    # res = build_dataset.build_datasets()
-    # dataloader = res.dataloader['val']
-    # for index, (img, label) in enumerate(dataloader):
-    #     print(img.shape, label)
-    # print("Load Dataset OK!")
-    # def getlabel(*args):
-    #     imgpath, c = args[0], args[1]
-    #     return (1, c)
-    #
-    # c = CustomBuildDatasetHelper('/Users/mazeyu/newEraFrom2020.5/skinCancer/data/train-2c/melanoma',1, call_back=getlabel)
-    #
-    # print(c[0][0].shape, c[0][1])
-
-    def getlabel(imgpath, classid):
-        return (classid, imgpath)
-
-    from cv.ProcessImage import ProcessImage
-    trim = ProcessImage()
-
-    with open(os.path.join(root ,opt.prior_knowledge_josn_path)) as f:
-        sym_dict = json.load(f)
-
-    def foo(imgpath, img):
-        appendix = sym_dict[imgpath]
-        appendix = torch.as_tensor(appendix)
-        appendix = appendix.expand([1, img.shape[1], img.shape[2]]).float()
-        return torch.cat([img, appendix], dim=0)
+    def get_label(imgpath, classid):
+        return classid
 
 
-    cbd = CustomBuildDataset('train-2c', {'melanoma':0, 'nevus':1}, transform=transform_example, call_back=getlabel, img_call_back=foo)
-    res = cbd.main()
-    print(res.dataset['train'][0][1])
-    print("+"*78)
-    print(res.dataset['train'][:100])
-    # for (data, label) in res.dataloader['train']:
-    #     print(data)
-    #     break
+    def img_call_back1(imgpath, img):
+        return img
 
+
+    custom_data_norm = CustomBuildDataset(dateset_name=opt.dataset_name, classes_dict={'melanoma': 0, 'nevus': 1},
+                                          transform=transform_example, call_back=get_label,
+                                          img_call_back=img_call_back1)
+    custom_data_norm = custom_data_norm.main()
+
+    for img, label in custom_data_norm.dataset['train']:
+        print(img)
 
 
 

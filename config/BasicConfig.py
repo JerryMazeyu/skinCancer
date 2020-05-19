@@ -35,7 +35,7 @@ class Config(object):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.criterion = torch.nn.CrossEntropyLoss()
         self.optimizer_ft = 'SGD' # SGD / Adam
-        self.lr = 0.001
+        self.lr = 1e-6
         self.custom_data = 'custom_data1'
         self.every_lr_decay = 10
         self.trainer = 'Trainer2'
