@@ -49,7 +49,7 @@ pyparsing==2.4.3
 python-dateutil==2.8.0
 pytz==2019.3
 PyWavelets==1.1.1
-PyYAML==5.1.2
+PyYAML==5.4
 pyzmq==18.1.1
 regex==2017.4.5
 requests==2.22.0
